@@ -5,7 +5,7 @@ import path from "path";
 const API_KEY = process.env.GEMINI_API_KEY!;
 const MODEL = "gemini-3-pro-image-preview";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
