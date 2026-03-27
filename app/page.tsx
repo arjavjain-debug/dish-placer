@@ -25,7 +25,7 @@ export default function Home() {
     setPreviews(newPreviews);
   }
 
-  function compressImage(file: File, maxSize = 1200): Promise<string> {
+  function compressImage(file: File, maxSize = 800): Promise<string> {
     return new Promise((resolve) => {
       const img = new window.Image();
       img.onload = () => {
@@ -35,7 +35,7 @@ export default function Home() {
         canvas.height = img.height * ratio;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
         resolve(dataUrl.split(",")[1]);
       };
       img.src = URL.createObjectURL(file);

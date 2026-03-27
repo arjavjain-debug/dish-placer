@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 const API_KEY = process.env.GEMINI_API_KEY!;
-const MODEL = "gemini-3.1-flash-image-preview";
+const MODEL = "gemini-3-pro-image-preview";
 
 export const maxDuration = 120;
 
@@ -28,26 +28,41 @@ export async function POST(req: NextRequest) {
   }));
 
   const n = dishes.length;
-  const dishRefs = Array.from({ length: n }, (_, i) => `Image ${i + 2}`).join(", ");
+  const dishRefs = Array.from({ length: n }, (_, i) => `Image ${i + 1}`).join(", ");
 
-  const prompt = `Image 1 is the BASE TABLE photo. Keep it EXACTLY as is — every existing item (bowls, chopsticks, napkins, cups, place settings) stays completely untouched. Do not alter, move, or remove anything.
+  const layoutInstructions: Record<number, string> = {
+    1: "Place the single dish dead-center on the open wood surface between the two place settings. It should be prominent and centered both horizontally and vertically in the empty zone.",
+    2: "Place the 2 dishes side-by-side horizontally in the center of the open wood surface, with a small natural gap between them. They should be evenly spaced and centered as a pair.",
+    3: "Arrange the 3 dishes in a tight triangle: one dish centered near the top of the open zone, and two dishes side-by-side below it. The group should be centered on the table.",
+    4: "Arrange the 4 dishes in a 2×2 grid in the center of the open wood zone. Two dishes on top row, two on bottom row, with small natural gaps. The grid should be centered on the table.",
+    5: "Arrange the 5 dishes like a quincunx (dice pattern): 2 on top, 1 in the center, 2 on the bottom — all tightly clustered in the center of the open wood zone.",
+    6: "Arrange the 6 dishes in a 2-row grid: 3 dishes on top, 3 dishes on the bottom, tightly clustered in the center of the open wood zone. Small natural gaps between dishes.",
+  };
 
-${dishRefs} are dish photos. From each, extract ONLY the main center dish/plate. Ignore everything else in those photos (background tables, rice bowls, other plates, hands, legs, chairs, water glasses, cutlery — ignore all of that).
+  const layout = layoutInstructions[n];
 
-PLACEMENT RULES:
-1. Every dish must be FULLY VISIBLE — absolutely NO cropping at edges. Every plate must be 100% within the frame.
-2. Keep the original portrait orientation and aspect ratio of the table image.
-3. Place all ${n} dishes in the open center area of the table between the two place settings. Arrange them naturally like a real Chinese family dinner — clustered together, close but not overlapping.
-4. Natural realistic plate sizes relative to the table.
-5. Leave breathing room from edges so nothing gets cut off.
-6. Match the lighting, shadows, and top-down camera angle perfectly. Photorealistic result.
+  const prompt = `${dishRefs} are dish reference photos. The LAST image is the actual table photo that you must edit.
 
-Return ONLY the final composited image.`;
+From each dish reference photo, extract only the main plate/bowl of food — ignore backgrounds, hands, other items.
 
+Edit the LAST image (the table photo) by placing all ${n} extracted ${n === 1 ? "dish" : "dishes"} onto the large empty dark wood surface in the center/upper area of the table. Do not modify anything already in the table photo.
+
+${layout}
+
+Rules:
+- Every dish fully visible, no cropping at edges.
+- Match the top-down overhead angle of the table photo.
+- Realistic plate sizes relative to existing bowls on the table.
+- Soft shadow under each dish.
+- Do not alter the table photo in any other way.
+
+Return only the final edited table photo.`;
+
+  // Dish images first as references, table image last = the image to be edited
   const parts: any[] = [
     { text: prompt },
-    { inline_data: { mime_type: "image/jpeg", data: tableB64 } },
     ...dishParts,
+    { inline_data: { mime_type: "image/jpeg", data: tableB64 } },
   ];
 
   const payload = {
@@ -60,21 +75,26 @@ Return ONLY the final composited image.`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
 
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  let resp: Response | null = null;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (resp.status !== 503) break;
+    if (attempt < 4) await new Promise((r) => setTimeout(r, attempt * 3000));
+  }
 
-  if (!resp.ok) {
-    const text = await resp.text();
+  if (!resp!.ok) {
+    const text = await resp!.text();
     return NextResponse.json(
       { error: `Gemini API error: ${text.slice(0, 200)}` },
-      { status: resp.status }
+      { status: resp!.status }
     );
   }
 
-  const result = await resp.json();
+  const result = await resp!.json();
 
   for (const candidate of result.candidates || []) {
     for (const part of candidate.content?.parts || []) {
