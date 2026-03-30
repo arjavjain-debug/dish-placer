@@ -19,7 +19,7 @@ export default function Home() {
   const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTable, setSelectedTable] = useState<"table" | "table2" | "custom">("table");
+  const [selectedTable, setSelectedTable] = useState<"table" | "table2" | "table3" | "custom">("table");
   const [customTableB64, setCustomTableB64] = useState<string | null>(null);
   const [customTablePreview, setCustomTablePreview] = useState<string | null>(null);
   const [placements, setPlacements] = useState<Placement[]>([]);
@@ -32,6 +32,7 @@ export default function Home() {
   const tables = [
     { id: "table" as const, label: "Dark Wood", src: "/table.jpg" },
     { id: "table2" as const, label: "Walnut Bistro", src: "/table2.jpg" },
+    { id: "table3" as const, label: "Mediterranean", src: "/table3.jpg" },
   ];
 
   const currentTableSrc =

@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     const allowedTables: Record<string, string> = {
       table: "table.jpg",
       table2: "table2.jpg",
+      table3: "table3.jpg",
     };
     const tableFile = allowedTables[tableId] ?? "table.jpg";
     const tablePath = path.join(process.cwd(), "public", tableFile);
