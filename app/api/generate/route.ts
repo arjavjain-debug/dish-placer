@@ -76,7 +76,7 @@ Rules:
 - Soft shadow under each dish.
 - Do not alter the table photo in any other way.
 
-Return only the final edited table photo.`;
+Return only the final edited table photo in 9:16 aspect ratio (portrait, taller than wide).`;
 
   // Dish images first as references, table image last = the image to be edited
   const parts: any[] = [
