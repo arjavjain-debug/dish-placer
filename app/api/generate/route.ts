@@ -10,14 +10,25 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const dishes: string[] = body.dishes || [];
+  const tableId: string = body.table || "table";
+  const customTable: string | undefined = body.customTable;
 
   if (!dishes.length) {
     return NextResponse.json({ error: "No dish images uploaded" }, { status: 400 });
   }
 
-  // Encode table image
-  const tablePath = path.join(process.cwd(), "public", "table.jpg");
-  const tableB64 = fs.readFileSync(tablePath).toString("base64");
+  let tableB64: string;
+  if (tableId === "custom" && customTable) {
+    tableB64 = customTable;
+  } else {
+    const allowedTables: Record<string, string> = {
+      table: "table.jpg",
+      table2: "table2.jpg",
+    };
+    const tableFile = allowedTables[tableId] ?? "table.jpg";
+    const tablePath = path.join(process.cwd(), "public", tableFile);
+    tableB64 = fs.readFileSync(tablePath).toString("base64");
+  }
 
   // Dish images already base64 from client
   const dishParts = dishes.map((b64: string) => ({
