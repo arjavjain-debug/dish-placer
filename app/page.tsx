@@ -1,6 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+
+type Placement = { dishIndex: number; x: number; y: number };
+
+const DEFAULT_POSITIONS: Record<number, { x: number; y: number }[]> = {
+  1: [{ x: 50, y: 50 }],
+  2: [{ x: 35, y: 50 }, { x: 65, y: 50 }],
+  3: [{ x: 50, y: 35 }, { x: 35, y: 62 }, { x: 65, y: 62 }],
+  4: [{ x: 35, y: 37 }, { x: 65, y: 37 }, { x: 35, y: 63 }, { x: 65, y: 63 }],
+  5: [{ x: 35, y: 37 }, { x: 65, y: 37 }, { x: 50, y: 52 }, { x: 35, y: 67 }, { x: 65, y: 67 }],
+  6: [{ x: 28, y: 37 }, { x: 50, y: 37 }, { x: 72, y: 37 }, { x: 28, y: 63 }, { x: 50, y: 63 }, { x: 72, y: 63 }],
+};
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
@@ -11,6 +22,10 @@ export default function Home() {
   const [selectedTable, setSelectedTable] = useState<"table" | "table2" | "custom">("table");
   const [customTableB64, setCustomTableB64] = useState<string | null>(null);
   const [customTablePreview, setCustomTablePreview] = useState<string | null>(null);
+  const [placements, setPlacements] = useState<Placement[]>([]);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const tableInputRef = useRef<HTMLInputElement>(null);
 
@@ -19,12 +34,21 @@ export default function Home() {
     { id: "table2" as const, label: "Walnut Bistro", src: "/table2.jpg" },
   ];
 
+  const currentTableSrc =
+    selectedTable === "custom" ? customTablePreview : `/${selectedTable}.jpg`;
+
+  function initPlacements(count: number) {
+    const positions = DEFAULT_POSITIONS[count] ?? DEFAULT_POSITIONS[6];
+    setPlacements(positions.slice(0, count).map((pos, i) => ({ dishIndex: i, ...pos })));
+  }
+
   function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files || []).slice(0, 6);
     setFiles(selected);
     setPreviews(selected.map((f) => URL.createObjectURL(f)));
     setResult(null);
     setError(null);
+    initPlacements(selected.length);
   }
 
   function removeFile(index: number) {
@@ -32,6 +56,7 @@ export default function Home() {
     const newPreviews = previews.filter((_, i) => i !== index);
     setFiles(newFiles);
     setPreviews(newPreviews);
+    initPlacements(newFiles.length);
   }
 
   function compressImage(file: File, maxSize = 800): Promise<string> {
@@ -44,8 +69,7 @@ export default function Home() {
         canvas.height = img.height * ratio;
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
-        resolve(dataUrl.split(",")[1]);
+        resolve(canvas.toDataURL("image/jpeg", 0.6).split(",")[1]);
       };
       img.src = URL.createObjectURL(file);
     });
@@ -61,6 +85,42 @@ export default function Home() {
     setResult(null);
     setError(null);
   }
+
+  // Drag handlers
+  function onDishMouseDown(e: React.MouseEvent, index: number) {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const currentX = (placements[index].x / 100) * rect.width;
+    const currentY = (placements[index].y / 100) * rect.height;
+    dragOffset.current = {
+      x: e.clientX - rect.left - currentX,
+      y: e.clientY - rect.top - currentY,
+    };
+    setDragging(index);
+  }
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (dragging === null) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.current.x) / rect.width) * 100));
+    const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.current.y) / rect.height) * 100));
+    setPlacements((prev) => prev.map((p, i) => (i === dragging ? { ...p, x, y } : p)));
+  }, [dragging]);
+
+  const onMouseUp = useCallback(() => setDragging(null), []);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [onMouseMove, onMouseUp]);
 
   async function generate() {
     if (!files.length) return;
@@ -79,6 +139,7 @@ export default function Home() {
           dishes,
           table: selectedTable,
           customTable: selectedTable === "custom" ? customTableB64 : undefined,
+          placements,
         }),
       });
 
@@ -140,20 +201,11 @@ export default function Home() {
               </button>
             ))}
 
-            {/* Upload custom table */}
-            <input
-              ref={tableInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleCustomTable}
-              className="hidden"
-            />
+            <input ref={tableInputRef} type="file" accept="image/*" onChange={handleCustomTable} className="hidden" />
             <button
               onClick={() => tableInputRef.current?.click()}
               className={`relative rounded-xl overflow-hidden border-2 transition-colors w-32 h-20 flex-shrink-0 ${
-                selectedTable === "custom" && customTablePreview
-                  ? "border-white"
-                  : "border-zinc-700 hover:border-zinc-500"
+                selectedTable === "custom" && customTablePreview ? "border-white" : "border-zinc-700 hover:border-zinc-500"
               }`}
             >
               {customTablePreview ? (
@@ -183,20 +235,13 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left: Upload */}
+          {/* Left: Upload + placement canvas */}
           <div>
             <div
               onClick={() => inputRef.current?.click()}
               className="border-2 border-dashed border-zinc-700 rounded-xl p-8 text-center cursor-pointer hover:border-zinc-500 transition-colors"
             >
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleFiles}
-                className="hidden"
-              />
+              <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" />
               <div className="text-zinc-400">
                 <svg className="w-10 h-10 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
@@ -205,23 +250,46 @@ export default function Home() {
               </div>
             </div>
 
-            {previews.length > 0 && (
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {previews.map((src, i) => (
-                  <div key={i} className="relative group">
-                    <img
-                      src={src}
-                      alt={`Dish ${i + 1}`}
-                      className="w-full aspect-square object-cover rounded-lg"
-                    />
-                    <button
-                      onClick={() => removeFile(i)}
-                      className="absolute top-1 right-1 bg-black/70 rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            {/* Placement canvas */}
+            {previews.length > 0 && currentTableSrc && (
+              <div className="mt-4">
+                <p className="text-xs text-zinc-500 mb-2">Drag dishes to reposition</p>
+                <div
+                  ref={canvasRef}
+                  className="relative w-full rounded-xl overflow-hidden select-none"
+                  style={{ cursor: dragging !== null ? "grabbing" : "default" }}
+                >
+                  <img
+                    src={currentTableSrc}
+                    alt="Table"
+                    className="w-full block rounded-xl"
+                    draggable={false}
+                  />
+                  {placements.map((p, i) => (
+                    <div
+                      key={i}
+                      className="absolute"
+                      style={{
+                        left: `${p.x}%`,
+                        top: `${p.y}%`,
+                        transform: "translate(-50%, -50%)",
+                        cursor: dragging === i ? "grabbing" : "grab",
+                        zIndex: dragging === i ? 10 : 1,
+                      }}
+                      onMouseDown={(e) => onDishMouseDown(e, i)}
                     >
-                      x
-                    </button>
-                  </div>
-                ))}
+                      <img
+                        src={previews[p.dishIndex]}
+                        alt={`Dish ${i + 1}`}
+                        className="w-14 h-14 object-cover rounded-full border-2 border-white shadow-lg"
+                        draggable={false}
+                      />
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-zinc-900 rounded-full flex items-center justify-center text-[9px] font-bold border border-zinc-600">
+                        {i + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -233,9 +301,7 @@ export default function Home() {
               {loading ? "Generating..." : "Place Dishes on Table"}
             </button>
 
-            {error && (
-              <p className="mt-3 text-red-400 text-sm">{error}</p>
-            )}
+            {error && <p className="mt-3 text-red-400 text-sm">{error}</p>}
           </div>
 
           {/* Right: Result */}
@@ -251,11 +317,7 @@ export default function Home() {
 
             {result && !loading && (
               <div>
-                <img
-                  src={result}
-                  alt="Result"
-                  className="w-full rounded-xl"
-                />
+                <img src={result} alt="Result" className="w-full rounded-xl" />
                 <button
                   onClick={download}
                   className="mt-4 w-full border border-zinc-700 py-2.5 rounded-lg text-sm hover:bg-zinc-800 transition-colors"

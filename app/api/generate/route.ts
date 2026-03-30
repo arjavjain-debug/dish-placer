@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
   const dishes: string[] = body.dishes || [];
   const tableId: string = body.table || "table";
   const customTable: string | undefined = body.customTable;
+  const placements: { dishIndex: number; x: number; y: number }[] = body.placements || [];
 
   if (!dishes.length) {
     return NextResponse.json({ error: "No dish images uploaded" }, { status: 400 });
@@ -41,29 +42,37 @@ export async function POST(req: NextRequest) {
   const n = dishes.length;
   const dishRefs = Array.from({ length: n }, (_, i) => `Image ${i + 1}`).join(", ");
 
-  const layoutInstructions: Record<number, string> = {
-    1: "Place the single dish dead-center on the open wood surface between the two place settings. It should be prominent and centered both horizontally and vertically in the empty zone.",
-    2: "Place the 2 dishes side-by-side horizontally in the center of the open wood surface, with a small natural gap between them. They should be evenly spaced and centered as a pair.",
-    3: "Arrange the 3 dishes in a tight triangle: one dish centered near the top of the open zone, and two dishes side-by-side below it. The group should be centered on the table.",
-    4: "Arrange the 4 dishes in a 2×2 grid in the center of the open wood zone. Two dishes on top row, two on bottom row, with small natural gaps. The grid should be centered on the table.",
-    5: "Arrange the 5 dishes like a quincunx (dice pattern): 2 on top, 1 in the center, 2 on the bottom — all tightly clustered in the center of the open wood zone.",
-    6: "Arrange the 6 dishes in a 2-row grid: 3 dishes on top, 3 dishes on the bottom, tightly clustered in the center of the open wood zone. Small natural gaps between dishes.",
-  };
-
-  const layout = layoutInstructions[n];
+  // Build layout instruction from placements (user-defined positions) or fall back to defaults
+  let layout: string;
+  if (placements.length === n) {
+    const positionLines = placements
+      .map((p) => `  - Image ${p.dishIndex + 1}: place at ${Math.round(p.x)}% from the left edge and ${Math.round(p.y)}% from the top edge of the table image`)
+      .join("\n");
+    layout = `Place each dish at the exact positions specified below (as % of the full table image dimensions):\n${positionLines}\nHonor these positions as closely as possible.`;
+  } else {
+    const layoutInstructions: Record<number, string> = {
+      1: "Place the single dish dead-center on the open surface between the two place settings.",
+      2: "Place the 2 dishes side-by-side horizontally in the center of the open surface, evenly spaced.",
+      3: "Arrange the 3 dishes in a triangle: one near the top-center, two below side-by-side.",
+      4: "Arrange the 4 dishes in a 2×2 grid in the center of the open zone.",
+      5: "Arrange the 5 dishes like a quincunx: 2 on top, 1 center, 2 on bottom.",
+      6: "Arrange the 6 dishes in a 2-row grid: 3 on top, 3 on bottom.",
+    };
+    layout = layoutInstructions[n] ?? layoutInstructions[6];
+  }
 
   const prompt = `${dishRefs} are dish reference photos. The LAST image is the actual table photo that you must edit.
 
 From each dish reference photo, extract only the main plate/bowl of food — ignore backgrounds, hands, other items.
 
-Edit the LAST image (the table photo) by placing all ${n} extracted ${n === 1 ? "dish" : "dishes"} onto the large empty dark wood surface in the center/upper area of the table. Do not modify anything already in the table photo.
+Edit the LAST image (the table photo) by placing all ${n} extracted ${n === 1 ? "dish" : "dishes"} onto the empty surface of the table. Do not modify anything already in the table photo.
 
 ${layout}
 
 Rules:
 - Every dish fully visible, no cropping at edges.
 - Match the top-down overhead angle of the table photo.
-- Realistic plate sizes relative to existing bowls on the table.
+- Realistic plate sizes relative to existing items on the table.
 - Soft shadow under each dish.
 - Do not alter the table photo in any other way.
 
