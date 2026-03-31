@@ -5,7 +5,7 @@ import path from "path";
 const API_KEY = process.env.GEMINI_API_KEY!;
 const MODEL = "gemini-3-pro-image-preview";
 
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -97,15 +97,14 @@ Return only the final edited table photo in 9:16 aspect ratio (portrait, taller 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
 
   let resp: Response | null = null;
-  const delays = [5000, 10000, 15000, 20000, 25000];
-  for (let attempt = 0; attempt <= delays.length; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
     resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (resp.status !== 503) break;
-    if (attempt < delays.length) await new Promise((r) => setTimeout(r, delays[attempt]));
+    if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 4000));
   }
 
   if (!resp!.ok) {
