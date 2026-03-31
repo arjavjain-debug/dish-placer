@@ -311,7 +311,7 @@ export default function Home() {
               <div className="border border-zinc-800 rounded-xl h-96 flex items-center justify-center">
                 <div className="text-center">
                   <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-zinc-400 text-sm">Placing dishes on table...</p>
+                  <p className="text-zinc-400 text-sm">Placing dishes on table — this may take up to a minute...</p>
                 </div>
               </div>
             )}
