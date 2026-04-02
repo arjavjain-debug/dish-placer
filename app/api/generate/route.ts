@@ -8,6 +8,7 @@ const MODEL = "gemini-3-pro-image-preview";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  try {
   const body = await req.json();
   const dishes: string[] = body.dishes || [];
   const tableId: string = body.table || "table";
@@ -135,4 +136,7 @@ Return only the final edited table photo.`;
   }
 
   return NextResponse.json({ error: "No image returned from Gemini" }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || "Internal server error" }, { status: 500 });
+  }
 }
