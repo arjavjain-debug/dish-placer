@@ -15,6 +15,11 @@ const DEFAULT_POSITIONS: Record<number, { x: number; y: number }[]> = {
 
 type TableId = "table" | "table2" | "table3" | "table4" | "table5" | "table6" | "table7";
 
+// Explicit output dimensions per template (w x h). Tables not listed use natural image dimensions.
+const TABLE_OUTPUT_DIMS: Partial<Record<TableId, { w: number; h: number }>> = {
+  table6: { w: 1920, h: 1080 }, // Charcoal — 16:9
+};
+
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -62,14 +67,15 @@ export default function Home() {
     initPlacements(newFiles.length);
   }
 
-  function fitToAspectRatio(blobUrl: string, targetSrc: string): Promise<string> {
+  function fitToAspectRatio(blobUrl: string, targetSrc: string, tableId: TableId): Promise<string> {
     return new Promise((resolve) => {
       const tableImg = new window.Image();
       tableImg.onload = () => {
         const resultImg = new window.Image();
         resultImg.onload = () => {
-          const tw = tableImg.naturalWidth;
-          const th = tableImg.naturalHeight;
+          const dims = TABLE_OUTPUT_DIMS[tableId];
+          const tw = dims ? dims.w : tableImg.naturalWidth;
+          const th = dims ? dims.h : tableImg.naturalHeight;
           const rw = resultImg.naturalWidth;
           const rh = resultImg.naturalHeight;
           const targetRatio = tw / th;
@@ -173,7 +179,7 @@ export default function Home() {
 
       const blob = await resp.blob();
       const rawUrl = URL.createObjectURL(blob);
-      const cropped = await fitToAspectRatio(rawUrl, currentTableSrc);
+      const cropped = await fitToAspectRatio(rawUrl, currentTableSrc, selectedTable);
       setResult(cropped);
     } catch (err: any) {
       setError(err.message);

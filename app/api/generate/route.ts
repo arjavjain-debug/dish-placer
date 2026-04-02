@@ -77,7 +77,7 @@ Rules:
 - Realistic plate sizes relative to existing items on the table.
 - Soft shadow under each dish.
 - Do not alter the table photo in any other way.
-- Output must be the exact same dimensions and aspect ratio as the input table photo.
+- Output must be the exact same dimensions and aspect ratio as the input table photo. Do not add any padding or borders.
 
 Return only the final edited table photo.`;
 
