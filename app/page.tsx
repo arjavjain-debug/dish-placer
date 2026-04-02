@@ -188,8 +188,10 @@ export default function Home() {
 
       const blob = await resp.blob();
       const rawUrl = URL.createObjectURL(blob);
-      const cropped = await fitToAspectRatio(rawUrl, currentTableSrc, selectedTable);
-      setResult(cropped);
+      const finalUrl = TABLE_OUTPUT_DIMS[selectedTable]
+        ? await fitToAspectRatio(rawUrl, currentTableSrc, selectedTable)
+        : rawUrl;
+      setResult(finalUrl);
     } catch (err: any) {
       setError(err.message);
     } finally {
