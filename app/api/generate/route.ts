@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import sharp from "sharp";
 
 const API_KEY = process.env.GEMINI_API_KEY!;
 const MODEL = "gemini-3-pro-image-preview";
@@ -31,7 +30,6 @@ export async function POST(req: NextRequest) {
   const tablePath = path.join(process.cwd(), "public", tableFile);
   const tableBuffer = fs.readFileSync(tablePath);
   const tableB64 = tableBuffer.toString("base64");
-  const { width: tableW, height: tableH } = await sharp(tableBuffer).metadata();
 
   // Dish images already base64 from client
   const dishParts = dishes.map((b64: string) => ({
@@ -121,20 +119,11 @@ Return only the final edited table photo at the same aspect ratio as the origina
   for (const candidate of result.candidates || []) {
     for (const part of candidate.content?.parts || []) {
       if (part.inlineData) {
-        let imgBuffer = Buffer.from(part.inlineData.data, "base64");
-
-        // Enforce table's original aspect ratio by cover-cropping the output
-        if (tableW && tableH) {
-          imgBuffer = await sharp(imgBuffer)
-            .resize(tableW, tableH, { fit: "cover", position: "centre" })
-            .jpeg({ quality: 90 })
-            .toBuffer();
-        }
-
+        const imgBuffer = Buffer.from(part.inlineData.data, "base64");
         return new NextResponse(imgBuffer, {
           headers: {
-            "Content-Type": "image/jpeg",
-            "Content-Disposition": "inline; filename=dish-placer-output.jpg",
+            "Content-Type": `image/${part.inlineData.mimeType?.split("/")[1] || "png"}`,
+            "Content-Disposition": "inline; filename=dish-placer-output.png",
           },
         });
       }
