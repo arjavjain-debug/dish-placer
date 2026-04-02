@@ -17,7 +17,10 @@ type TableId = "table" | "table2" | "table3" | "table4" | "table5" | "table6" | 
 
 // Explicit output dimensions per template (w x h). Tables not listed use natural image dimensions.
 const TABLE_OUTPUT_DIMS: Partial<Record<TableId, { w: number; h: number }>> = {
+  table4: { w: 1080, h: 1920 }, // Oak & Coral — 9:16
+  table5: { w: 1080, h: 1080 }, // Marble Round — 1:1
   table6: { w: 1920, h: 1080 }, // Charcoal — 16:9
+  table7: { w: 1080, h: 1080 }, // Pine & Leather — 1:1
 };
 
 export default function Home() {
