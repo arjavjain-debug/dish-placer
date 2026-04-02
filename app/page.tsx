@@ -211,12 +211,12 @@ export default function Home() {
                 <div
                   ref={canvasRef}
                   className="relative w-full select-none"
-                  style={{ paddingBottom: "177.78%", cursor: dragging !== null ? "grabbing" : "default" }}
+                  style={{ cursor: dragging !== null ? "grabbing" : "default" }}
                 >
                   <img
                     src={currentTableSrc}
                     alt="Table"
-                    className="absolute inset-0 w-full h-full object-cover rounded-xl"
+                    className="w-full block rounded-xl"
                     draggable={false}
                   />
                   {placements.map((p, i) => (
