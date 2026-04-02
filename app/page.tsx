@@ -13,7 +13,7 @@ const DEFAULT_POSITIONS: Record<number, { x: number; y: number }[]> = {
   6: [{ x: 28, y: 37 }, { x: 50, y: 37 }, { x: 72, y: 37 }, { x: 28, y: 63 }, { x: 50, y: 63 }, { x: 72, y: 63 }],
 };
 
-type TableId = "table" | "table2" | "table3" | "table4" | "table5" | "table6";
+type TableId = "table" | "table2" | "table3" | "table4" | "table5" | "table6" | "table7";
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
@@ -35,6 +35,7 @@ export default function Home() {
     { id: "table4", label: "Oak & Coral", src: "/table4.jpg" },
     { id: "table5", label: "Marble Round", src: "/table5.jpg" },
     { id: "table6", label: "Charcoal", src: "/table6.jpg" },
+    { id: "table7", label: "Pine & Leather", src: "/table7.jpg" },
   ];
 
   const currentTableSrc = `/${selectedTable}.jpg`;
