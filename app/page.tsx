@@ -13,33 +13,31 @@ const DEFAULT_POSITIONS: Record<number, { x: number; y: number }[]> = {
   6: [{ x: 28, y: 37 }, { x: 50, y: 37 }, { x: 72, y: 37 }, { x: 28, y: 63 }, { x: 50, y: 63 }, { x: 72, y: 63 }],
 };
 
+type TableId = "table" | "table2" | "table3" | "table4" | "table5" | "table6";
+
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTable, setSelectedTable] = useState<"table" | "table2" | "table3" | "table4" | "table5" | "table6" | "custom">("table");
-  const [customTableB64, setCustomTableB64] = useState<string | null>(null);
-  const [customTablePreview, setCustomTablePreview] = useState<string | null>(null);
+  const [selectedTable, setSelectedTable] = useState<TableId>("table");
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [dragging, setDragging] = useState<number | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const tableInputRef = useRef<HTMLInputElement>(null);
 
-  const tables = [
-    { id: "table" as const, label: "Dark Wood", src: "/table.jpg" },
-    { id: "table2" as const, label: "Walnut Bistro", src: "/table2.jpg" },
-    { id: "table3" as const, label: "Mediterranean", src: "/table3.jpg" },
-    { id: "table4" as const, label: "Oak & Coral", src: "/table4.jpg" },
-    { id: "table5" as const, label: "Marble Round", src: "/table5.jpg" },
-    { id: "table6" as const, label: "Charcoal", src: "/table6.jpg" },
+  const tables: { id: TableId; label: string; src: string }[] = [
+    { id: "table", label: "Dark Wood", src: "/table.jpg" },
+    { id: "table2", label: "Walnut Bistro", src: "/table2.jpg" },
+    { id: "table3", label: "Mediterranean", src: "/table3.jpg" },
+    { id: "table4", label: "Oak & Coral", src: "/table4.jpg" },
+    { id: "table5", label: "Marble Round", src: "/table5.jpg" },
+    { id: "table6", label: "Charcoal", src: "/table6.jpg" },
   ];
 
-  const currentTableSrc =
-    selectedTable === "custom" ? customTablePreview : `/${selectedTable}.jpg`;
+  const currentTableSrc = `/${selectedTable}.jpg`;
 
   function initPlacements(count: number) {
     const positions = DEFAULT_POSITIONS[count] ?? DEFAULT_POSITIONS[6];
@@ -79,18 +77,6 @@ export default function Home() {
     });
   }
 
-  async function handleCustomTable(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setCustomTablePreview(URL.createObjectURL(file));
-    const b64 = await compressImage(file, 1500);
-    setCustomTableB64(b64);
-    setSelectedTable("custom");
-    setResult(null);
-    setError(null);
-  }
-
-  // Drag handlers
   function onDishMouseDown(e: React.MouseEvent, index: number) {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -128,7 +114,6 @@ export default function Home() {
 
   async function generate() {
     if (!files.length) return;
-    if (selectedTable === "custom" && !customTableB64) return;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -139,12 +124,7 @@ export default function Home() {
       const resp = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dishes,
-          table: selectedTable,
-          customTable: selectedTable === "custom" ? customTableB64 : undefined,
-          placements,
-        }),
+        body: JSON.stringify({ dishes, table: selectedTable, placements }),
       });
 
       if (!resp.ok) {
@@ -204,37 +184,6 @@ export default function Home() {
                 )}
               </button>
             ))}
-
-            <input ref={tableInputRef} type="file" accept="image/*" onChange={handleCustomTable} className="hidden" />
-            <button
-              onClick={() => tableInputRef.current?.click()}
-              className={`relative rounded-xl overflow-hidden border-2 transition-colors w-32 h-20 flex-shrink-0 ${
-                selectedTable === "custom" && customTablePreview ? "border-white" : "border-zinc-700 hover:border-zinc-500"
-              }`}
-            >
-              {customTablePreview ? (
-                <>
-                  <img src={customTablePreview} alt="Custom table" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/30 flex items-end p-1.5">
-                    <span className="text-xs font-medium text-white leading-none">My Table</span>
-                  </div>
-                  {selectedTable === "custom" && (
-                    <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-black" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-zinc-500">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span className="text-xs">Upload yours</span>
-                </div>
-              )}
-            </button>
           </div>
         </div>
 
@@ -255,7 +204,7 @@ export default function Home() {
             </div>
 
             {/* Placement canvas */}
-            {previews.length > 0 && currentTableSrc && (
+            {previews.length > 0 && (
               <div className="mt-4">
                 <p className="text-xs text-zinc-500 mb-2">Drag dishes to reposition</p>
                 <div
@@ -299,7 +248,7 @@ export default function Home() {
 
             <button
               onClick={generate}
-              disabled={!files.length || loading || (selectedTable === "custom" && !customTableB64)}
+              disabled={!files.length || loading}
               className="mt-6 w-full bg-white text-black font-semibold py-3 rounded-lg hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Generating..." : "Place Dishes on Table"}
