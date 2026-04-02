@@ -80,24 +80,19 @@ export default function Home() {
           const rh = resultImg.naturalHeight;
           const targetRatio = tw / th;
           const srcRatio = rw / rh;
-          // contain: scale result to fit inside target dimensions without cropping
-          let dw: number, dh: number;
+          // cover: fill target exactly, crop excess from center
+          let sx = 0, sy = 0, sw = rw, sh = rh;
           if (srcRatio > targetRatio) {
-            dw = tw;
-            dh = tw / srcRatio;
+            sw = rh * targetRatio;
+            sx = (rw - sw) / 2;
           } else {
-            dh = th;
-            dw = th * srcRatio;
+            sh = rw / targetRatio;
+            sy = (rh - sh) / 2;
           }
-          const dx = (tw - dw) / 2;
-          const dy = (th - dh) / 2;
           const canvas = document.createElement("canvas");
           canvas.width = tw;
           canvas.height = th;
-          const ctx = canvas.getContext("2d")!;
-          ctx.fillStyle = "#000";
-          ctx.fillRect(0, 0, tw, th);
-          ctx.drawImage(resultImg, 0, 0, rw, rh, dx, dy, dw, dh);
+          canvas.getContext("2d")!.drawImage(resultImg, sx, sy, sw, sh, 0, 0, tw, th);
           resolve(canvas.toDataURL("image/jpeg", 0.92));
         };
         resultImg.src = blobUrl;
@@ -169,7 +164,12 @@ export default function Home() {
       const resp = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dishes, table: selectedTable, placements }),
+        body: JSON.stringify({
+          dishes,
+          table: selectedTable,
+          placements,
+          outputDims: TABLE_OUTPUT_DIMS[selectedTable] ?? null,
+        }),
       });
 
       if (!resp.ok) {

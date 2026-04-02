@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
   const dishes: string[] = body.dishes || [];
   const tableId: string = body.table || "table";
   const placements: { dishIndex: number; x: number; y: number }[] = body.placements || [];
+  const outputDims: { w: number; h: number } | null = body.outputDims ?? null;
 
   if (!dishes.length) {
     return NextResponse.json({ error: "No dish images uploaded" }, { status: 400 });
@@ -77,7 +78,7 @@ Rules:
 - Realistic plate sizes relative to existing items on the table.
 - Soft shadow under each dish.
 - Do not alter the table photo in any other way.
-- Output must be the exact same dimensions and aspect ratio as the input table photo. Do not add any padding or borders.
+- Output must be ${outputDims ? `${outputDims.w}x${outputDims.h} pixels (${outputDims.w}:${outputDims.h} aspect ratio)` : "the exact same dimensions and aspect ratio as the input table photo"}. Do not add any padding or borders.
 
 Return only the final edited table photo.`;
 
