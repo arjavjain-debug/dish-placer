@@ -173,8 +173,14 @@ export default function Home() {
       });
 
       if (!resp.ok) {
-        const data = await resp.json();
-        throw new Error(data.error || "Generation failed");
+        let msg = "Generation failed";
+        try {
+          const data = await resp.json();
+          msg = data.error || msg;
+        } catch {
+          msg = await resp.text().then(t => t.slice(0, 300)) || msg;
+        }
+        throw new Error(msg);
       }
 
       const blob = await resp.blob();
