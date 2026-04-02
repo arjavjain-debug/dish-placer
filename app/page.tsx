@@ -62,7 +62,7 @@ export default function Home() {
     initPlacements(newFiles.length);
   }
 
-  function cropToAspectRatio(blobUrl: string, targetSrc: string): Promise<string> {
+  function fitToAspectRatio(blobUrl: string, targetSrc: string): Promise<string> {
     return new Promise((resolve) => {
       const tableImg = new window.Image();
       tableImg.onload = () => {
@@ -74,18 +74,24 @@ export default function Home() {
           const rh = resultImg.naturalHeight;
           const targetRatio = tw / th;
           const srcRatio = rw / rh;
-          let sx = 0, sy = 0, sw = rw, sh = rh;
+          // contain: scale result to fit inside target dimensions without cropping
+          let dw: number, dh: number;
           if (srcRatio > targetRatio) {
-            sw = rh * targetRatio;
-            sx = (rw - sw) / 2;
+            dw = tw;
+            dh = tw / srcRatio;
           } else {
-            sh = rw / targetRatio;
-            sy = (rh - sh) / 2;
+            dh = th;
+            dw = th * srcRatio;
           }
+          const dx = (tw - dw) / 2;
+          const dy = (th - dh) / 2;
           const canvas = document.createElement("canvas");
           canvas.width = tw;
           canvas.height = th;
-          canvas.getContext("2d")!.drawImage(resultImg, sx, sy, sw, sh, 0, 0, tw, th);
+          const ctx = canvas.getContext("2d")!;
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, tw, th);
+          ctx.drawImage(resultImg, 0, 0, rw, rh, dx, dy, dw, dh);
           resolve(canvas.toDataURL("image/jpeg", 0.92));
         };
         resultImg.src = blobUrl;
@@ -167,7 +173,7 @@ export default function Home() {
 
       const blob = await resp.blob();
       const rawUrl = URL.createObjectURL(blob);
-      const cropped = await cropToAspectRatio(rawUrl, currentTableSrc);
+      const cropped = await fitToAspectRatio(rawUrl, currentTableSrc);
       setResult(cropped);
     } catch (err: any) {
       setError(err.message);

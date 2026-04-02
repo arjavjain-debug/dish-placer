@@ -70,13 +70,16 @@ Edit the LAST image (the table photo) by placing all ${n} extracted ${n === 1 ? 
 ${layout}
 
 Rules:
+- Keep the EXACT same framing, field of view, zoom level, and composition as the original table photo. Do NOT zoom in, pan, or change the camera perspective in any way.
+- Every chair, floor, wall, and surrounding detail visible in the original must remain visible in the output.
 - Every dish fully visible, no cropping at edges.
 - Match the top-down overhead angle of the table photo.
 - Realistic plate sizes relative to existing items on the table.
 - Soft shadow under each dish.
 - Do not alter the table photo in any other way.
+- Output must be the exact same dimensions and aspect ratio as the input table photo.
 
-Return only the final edited table photo at the same aspect ratio as the original table image.`;
+Return only the final edited table photo.`;
 
   // Dish images first as references, table image last = the image to be edited
   const parts: any[] = [
