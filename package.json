@@ -5,9 +5,17 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "build:mobile": "BUILD_TARGET=mobile next build",
+    "sync:mobile": "BUILD_TARGET=mobile next build && cap sync",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",

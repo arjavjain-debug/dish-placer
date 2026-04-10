@@ -164,7 +164,8 @@ export default function Home() {
     try {
       const dishes = await Promise.all(files.map((f) => compressImage(f)));
 
-      const resp = await fetch("/api/generate", {
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "";
+      const resp = await fetch(`${apiBase}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
