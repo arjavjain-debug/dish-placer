@@ -197,11 +197,22 @@ export default function Home() {
     }
   }
 
-  function download() {
+  async function saveOrShare() {
     if (!result) return;
+    try {
+      const blob = await fetch(result).then((r) => r.blob());
+      const file = new File([blob], "dish-placer-output.jpg", { type: blob.type || "image/jpeg" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "Dish Placer" });
+        return;
+      }
+    } catch {
+      // user canceled share, or share failed — fall through to download
+      return;
+    }
     const a = document.createElement("a");
     a.href = result;
-    a.download = "dish-placer-output.png";
+    a.download = "dish-placer-output.jpg";
     a.click();
   }
 
@@ -339,10 +350,10 @@ export default function Home() {
               <div>
                 <img src={result} alt="Result" className="w-full rounded-xl" />
                 <button
-                  onClick={download}
+                  onClick={saveOrShare}
                   className="mt-4 w-full border border-zinc-700 py-2.5 rounded-lg text-sm hover:bg-zinc-800 transition-colors"
                 >
-                  Download Image
+                  Save or Share
                 </button>
               </div>
             )}
