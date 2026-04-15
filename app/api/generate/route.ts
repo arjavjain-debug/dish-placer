@@ -7,6 +7,21 @@ const MODEL = "gemini-3-pro-image-preview";
 
 export const maxDuration = 60;
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+function withCors(res: NextResponse) {
+  for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v);
+  return res;
+}
+
 export async function POST(req: NextRequest) {
   try {
   const body = await req.json();
@@ -16,7 +31,7 @@ export async function POST(req: NextRequest) {
   const outputDims: { w: number; h: number } | null = body.outputDims ?? null;
 
   if (!dishes.length) {
-    return NextResponse.json({ error: "No dish images uploaded" }, { status: 400 });
+    return withCors(NextResponse.json({ error: "No dish images uploaded" }, { status: 400 }));
   }
 
   const allowedTables: Record<string, string> = {
@@ -113,10 +128,10 @@ Return only the final edited table photo.`;
 
   if (!resp!.ok) {
     const text = await resp!.text();
-    return NextResponse.json(
+    return withCors(NextResponse.json(
       { error: `Gemini API error: ${text.slice(0, 200)}` },
       { status: resp!.status }
-    );
+    ));
   }
 
   const result = await resp!.json();
@@ -129,14 +144,15 @@ Return only the final edited table photo.`;
           headers: {
             "Content-Type": `image/${part.inlineData.mimeType?.split("/")[1] || "png"}`,
             "Content-Disposition": "inline; filename=dish-placer-output.png",
+            ...CORS_HEADERS,
           },
         });
       }
     }
   }
 
-  return NextResponse.json({ error: "No image returned from Gemini" }, { status: 500 });
+  return withCors(NextResponse.json({ error: "No image returned from Gemini" }, { status: 500 }));
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Internal server error" }, { status: 500 });
+    return withCors(NextResponse.json({ error: err?.message || "Internal server error" }, { status: 500 }));
   }
 }

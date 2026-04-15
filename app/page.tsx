@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef } from "react";
 
 type Placement = { dishIndex: number; x: number; y: number };
 
@@ -120,10 +120,11 @@ export default function Home() {
     });
   }
 
-  function onDishMouseDown(e: React.MouseEvent, index: number) {
+  function onDishPointerDown(e: React.PointerEvent, index: number) {
     e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const rect = canvas.getBoundingClientRect();
     const currentX = (placements[index].x / 100) * rect.width;
     const currentY = (placements[index].y / 100) * rect.height;
@@ -134,26 +135,22 @@ export default function Home() {
     setDragging(index);
   }
 
-  const onMouseMove = useCallback((e: MouseEvent) => {
-    if (dragging === null) return;
+  function onDishPointerMove(e: React.PointerEvent, index: number) {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.current.x) / rect.width) * 100));
     const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.current.y) / rect.height) * 100));
-    setPlacements((prev) => prev.map((p, i) => (i === dragging ? { ...p, x, y } : p)));
-  }, [dragging]);
+    setPlacements((prev) => prev.map((p, i) => (i === index ? { ...p, x, y } : p)));
+  }
 
-  const onMouseUp = useCallback(() => setDragging(null), []);
-
-  useEffect(() => {
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [onMouseMove, onMouseUp]);
+  function onDishPointerUp(e: React.PointerEvent) {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    setDragging(null);
+  }
 
   async function generate() {
     if (!files.length) return;
@@ -209,19 +206,25 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight">Dish Placer</h1>
-          <p className="text-zinc-400 mt-2">
+    <div
+      className="min-h-screen bg-zinc-950 text-white"
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+        <div className="mb-6 sm:mb-10">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dish Placer</h1>
+          <p className="text-zinc-400 mt-1.5 sm:mt-2 text-sm sm:text-base">
             Upload photos of dishes and they&apos;ll be placed on the table automatically.
           </p>
         </div>
 
         {/* Table selector */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <p className="text-sm text-zinc-400 mb-3">Choose a table</p>
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
             {tables.map((t) => (
               <button
                 key={t.id}
@@ -246,21 +249,22 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
           {/* Left: Upload + placement canvas */}
           <div>
-            <div
+            <button
+              type="button"
               onClick={() => inputRef.current?.click()}
-              className="border-2 border-dashed border-zinc-700 rounded-xl p-8 text-center cursor-pointer hover:border-zinc-500 transition-colors"
+              className="w-full border-2 border-dashed border-zinc-700 rounded-xl p-6 sm:p-8 text-center cursor-pointer active:border-zinc-400 hover:border-zinc-500 transition-colors"
             >
               <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" />
               <div className="text-zinc-400">
-                <svg className="w-10 h-10 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-2 sm:mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                 </svg>
-                <p className="text-sm">Click to upload dish images (up to 6)</p>
+                <p className="text-sm">Tap to upload dish images (up to 6)</p>
               </div>
-            </div>
+            </button>
 
             {/* Placement canvas */}
             {previews.length > 0 && (
@@ -287,8 +291,12 @@ export default function Home() {
                         transform: "translate(-50%, -50%)",
                         cursor: dragging === i ? "grabbing" : "grab",
                         zIndex: dragging === i ? 10 : 1,
+                        touchAction: "none",
                       }}
-                      onMouseDown={(e) => onDishMouseDown(e, i)}
+                      onPointerDown={(e) => onDishPointerDown(e, i)}
+                      onPointerMove={(e) => onDishPointerMove(e, i)}
+                      onPointerUp={onDishPointerUp}
+                      onPointerCancel={onDishPointerUp}
                     >
                       <img
                         src={previews[p.dishIndex]}
@@ -340,7 +348,7 @@ export default function Home() {
             )}
 
             {!result && !loading && (
-              <div className="border border-zinc-800 rounded-xl h-96 flex items-center justify-center">
+              <div className="hidden lg:flex border border-zinc-800 rounded-xl h-96 items-center justify-center">
                 <p className="text-zinc-600 text-sm">Result will appear here</p>
               </div>
             )}
