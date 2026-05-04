@@ -95,8 +95,10 @@ export default function Home() {
           const canvas = document.createElement("canvas");
           canvas.width = tw;
           canvas.height = th;
-          canvas.getContext("2d")!.drawImage(resultImg, sx, sy, sw, sh, 0, 0, tw, th);
-          resolve(canvas.toDataURL("image/jpeg", 0.92));
+          const ctx = canvas.getContext("2d")!;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(resultImg, sx, sy, sw, sh, 0, 0, tw, th);
+          resolve(canvas.toDataURL("image/png"));
         };
         resultImg.src = blobUrl;
       };
@@ -104,7 +106,7 @@ export default function Home() {
     });
   }
 
-  function compressImage(file: File, maxSize = 800): Promise<string> {
+  function compressImage(file: File, maxSize = 1500): Promise<string> {
     return new Promise((resolve) => {
       const img = new window.Image();
       img.onload = () => {
@@ -113,8 +115,9 @@ export default function Home() {
         canvas.width = img.width * ratio;
         canvas.height = img.height * ratio;
         const ctx = canvas.getContext("2d")!;
+        ctx.imageSmoothingQuality = "high";
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.6).split(",")[1]);
+        resolve(canvas.toDataURL("image/jpeg", 0.92).split(",")[1]);
       };
       img.src = URL.createObjectURL(file);
     });
@@ -201,7 +204,8 @@ export default function Home() {
     if (!result) return;
     try {
       const blob = await fetch(result).then((r) => r.blob());
-      const file = new File([blob], "dish-placer-output.jpg", { type: blob.type || "image/jpeg" });
+      const ext = (blob.type.split("/")[1] || "png").replace("jpeg", "jpg");
+      const file = new File([blob], `dish-placer-output.${ext}`, { type: blob.type || "image/png" });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: "Dish Placer" });
         return;
@@ -212,7 +216,7 @@ export default function Home() {
     }
     const a = document.createElement("a");
     a.href = result;
-    a.download = "dish-placer-output.jpg";
+    a.download = "dish-placer-output.png";
     a.click();
   }
 
