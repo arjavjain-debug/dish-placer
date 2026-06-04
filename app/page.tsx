@@ -70,6 +70,14 @@ export default function Home() {
     initPlacements(newFiles.length);
   }
 
+  function getImageDims(src: string): Promise<{ w: number; h: number }> {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.src = src;
+    });
+  }
+
   function fitToAspectRatio(blobUrl: string, targetSrc: string, tableId: TableId): Promise<string> {
     return new Promise((resolve) => {
       const tableImg = new window.Image();
@@ -106,7 +114,7 @@ export default function Home() {
     });
   }
 
-  function compressImage(file: File, maxSize = 1500): Promise<string> {
+  function compressImage(file: File, maxSize = 1024): Promise<string> {
     return new Promise((resolve) => {
       const img = new window.Image();
       img.onload = () => {
@@ -164,6 +172,10 @@ export default function Home() {
     try {
       const dishes = await Promise.all(files.map((f) => compressImage(f)));
 
+      // Always send the target dimensions so the server can request the closest
+      // supported output size: explicit template dims, else the table's natural size.
+      const dims = TABLE_OUTPUT_DIMS[selectedTable] ?? (await getImageDims(currentTableSrc));
+
       const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "";
       const resp = await fetch(`${apiBase}/api/generate`, {
         method: "POST",
@@ -172,7 +184,7 @@ export default function Home() {
           dishes,
           table: selectedTable,
           placements,
-          outputDims: TABLE_OUTPUT_DIMS[selectedTable] ?? null,
+          outputDims: dims,
         }),
       });
 
@@ -189,9 +201,9 @@ export default function Home() {
 
       const blob = await resp.blob();
       const rawUrl = URL.createObjectURL(blob);
-      const finalUrl = TABLE_OUTPUT_DIMS[selectedTable]
-        ? await fitToAspectRatio(rawUrl, currentTableSrc, selectedTable)
-        : rawUrl;
+      // Always crop to the table's exact aspect ratio (the model only returns
+      // a few fixed sizes, so the result rarely matches the table precisely).
+      const finalUrl = await fitToAspectRatio(rawUrl, currentTableSrc, selectedTable);
       setResult(finalUrl);
     } catch (err: any) {
       setError(err.message);

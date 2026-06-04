@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
 
-const API_KEY = process.env.GEMINI_API_KEY!;
-const MODEL = "gemini-3-pro-image-preview";
+// The model outputs ~1024px regardless of input resolution, so shrinking inputs
+// to 1024px is the single biggest speed win (the baked table is 4284x5712).
+async function shrink(buf: Buffer): Promise<Buffer> {
+  return sharp(buf)
+    .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+}
+
+const API_KEY = process.env.OPENAI_API_KEY!;
+const MODEL = "gpt-image-2";
+// "low" effort completes in ~30s (fits Vercel Hobby's 60s cap) at full
+// resolution. "medium" (~70s) and "high" (~220s) need Vercel Pro's 300s limit.
+const QUALITY = "low";
 
 export const maxDuration = 60;
 
@@ -22,63 +35,64 @@ function withCors(res: NextResponse) {
   return res;
 }
 
+// Pick the closest supported output size to the table's aspect ratio; the
+// client crops the result to exact dimensions afterward.
+function pickSize(dims: { w: number; h: number } | null): string {
+  if (!dims) return "auto";
+  const ratio = dims.w / dims.h;
+  if (ratio > 1.2) return "1536x1024"; // landscape
+  if (ratio < 0.83) return "1024x1536"; // portrait
+  return "1024x1024"; // square-ish
+}
+
 export async function POST(req: NextRequest) {
   try {
-  const body = await req.json();
-  const dishes: string[] = body.dishes || [];
-  const tableId: string = body.table || "table";
-  const placements: { dishIndex: number; x: number; y: number }[] = body.placements || [];
-  const outputDims: { w: number; h: number } | null = body.outputDims ?? null;
+    const body = await req.json();
+    const dishes: string[] = body.dishes || [];
+    const tableId: string = body.table || "table";
+    const placements: { dishIndex: number; x: number; y: number }[] = body.placements || [];
+    const outputDims: { w: number; h: number } | null = body.outputDims ?? null;
 
-  if (!dishes.length) {
-    return withCors(NextResponse.json({ error: "No dish images uploaded" }, { status: 400 }));
-  }
+    if (!dishes.length) {
+      return withCors(NextResponse.json({ error: "No dish images uploaded" }, { status: 400 }));
+    }
 
-  const allowedTables: Record<string, string> = {
-    table: "table.jpg",
-    table2: "table2.jpg",
-    table3: "table3.jpg",
-    table4: "table4.jpg",
-    table5: "table5.jpg",
-    table6: "table6.jpg",
-    table7: "table7.jpg",
-  };
-  const tableFile = allowedTables[tableId] ?? "table.jpg";
-  const tablePath = path.join(process.cwd(), "public", tableFile);
-  const tableBuffer = fs.readFileSync(tablePath);
-  const tableB64 = tableBuffer.toString("base64");
-
-  // Dish images already base64 from client
-  const dishParts = dishes.map((b64: string) => ({
-    inline_data: {
-      mime_type: "image/jpeg",
-      data: b64,
-    },
-  }));
-
-  const n = dishes.length;
-  const dishRefs = Array.from({ length: n }, (_, i) => `Image ${i + 1}`).join(", ");
-
-  // Build layout instruction from placements (user-defined positions) or fall back to defaults
-  let layout: string;
-  if (placements.length === n) {
-    const positionLines = placements
-      .map((p) => `  - Image ${p.dishIndex + 1}: place at ${Math.round(p.x)}% from the left edge and ${Math.round(p.y)}% from the top edge of the table image`)
-      .join("\n");
-    layout = `Place each dish at the exact positions specified below (as % of the full table image dimensions):\n${positionLines}\nHonor these positions as closely as possible.`;
-  } else {
-    const layoutInstructions: Record<number, string> = {
-      1: "Place the single dish dead-center on the open surface between the two place settings.",
-      2: "Place the 2 dishes side-by-side horizontally in the center of the open surface, evenly spaced.",
-      3: "Arrange the 3 dishes in a triangle: one near the top-center, two below side-by-side.",
-      4: "Arrange the 4 dishes in a 2×2 grid in the center of the open zone.",
-      5: "Arrange the 5 dishes like a quincunx: 2 on top, 1 center, 2 on bottom.",
-      6: "Arrange the 6 dishes in a 2-row grid: 3 on top, 3 on bottom.",
+    const allowedTables: Record<string, string> = {
+      table: "table.jpg",
+      table2: "table2.jpg",
+      table3: "table3.jpg",
+      table4: "table4.jpg",
+      table5: "table5.jpg",
+      table6: "table6.jpg",
+      table7: "table7.jpg",
     };
-    layout = layoutInstructions[n] ?? layoutInstructions[6];
-  }
+    const tableFile = allowedTables[tableId] ?? "table.jpg";
+    const tablePath = path.join(process.cwd(), "public", tableFile);
+    const tableBuffer = fs.readFileSync(tablePath);
 
-  const prompt = `${dishRefs} are dish reference photos. The LAST image is the actual table photo that you must edit.
+    const n = dishes.length;
+    const dishRefs = Array.from({ length: n }, (_, i) => `Image ${i + 1}`).join(", ");
+
+    // Build layout instruction from placements (user-defined positions) or fall back to defaults
+    let layout: string;
+    if (placements.length === n) {
+      const positionLines = placements
+        .map((p) => `  - Image ${p.dishIndex + 1}: place at ${Math.round(p.x)}% from the left edge and ${Math.round(p.y)}% from the top edge of the table image`)
+        .join("\n");
+      layout = `Place each dish at the exact positions specified below (as % of the full table image dimensions):\n${positionLines}\nHonor these positions as closely as possible.`;
+    } else {
+      const layoutInstructions: Record<number, string> = {
+        1: "Place the single dish dead-center on the open surface between the two place settings.",
+        2: "Place the 2 dishes side-by-side horizontally in the center of the open surface, evenly spaced.",
+        3: "Arrange the 3 dishes in a triangle: one near the top-center, two below side-by-side.",
+        4: "Arrange the 4 dishes in a 2×2 grid in the center of the open zone.",
+        5: "Arrange the 5 dishes like a quincunx: 2 on top, 1 center, 2 on bottom.",
+        6: "Arrange the 6 dishes in a 2-row grid: 3 on top, 3 on bottom.",
+      };
+      layout = layoutInstructions[n] ?? layoutInstructions[6];
+    }
+
+    const prompt = `You are given ${n + 1} images. The FIRST ${n} (${dishRefs}) are dish reference photos. The LAST image is the actual table photo that must be edited.
 
 From each dish reference photo, extract only the main plate/bowl of food — ignore backgrounds, hands, other items.
 
@@ -94,64 +108,58 @@ Rules:
 - Realistic plate sizes relative to existing items on the table.
 - Soft shadow under each dish.
 - Do not alter the table photo in any other way.
-- Output must be ${outputDims ? `${outputDims.w}x${outputDims.h} pixels (${outputDims.w}:${outputDims.h} aspect ratio)` : "the exact same dimensions and aspect ratio as the input table photo"}. Do not add any padding or borders.
 
 Return only the final edited table photo.`;
 
-  // Dish images first as references, table image last = the image to be edited
-  const parts: any[] = [
-    { text: prompt },
-    ...dishParts,
-    { inline_data: { mime_type: "image/jpeg", data: tableB64 } },
-  ];
+    // Build multipart form for the OpenAI image edits endpoint.
+    // Dish references first, table photo last (matches the prompt ordering).
+    const form = new FormData();
+    form.append("model", MODEL);
+    form.append("prompt", prompt);
+    form.append("size", pickSize(outputDims));
+    form.append("quality", QUALITY);
 
-  const payload = {
-    contents: [{ parts }],
-    generationConfig: {
-      responseModalities: ["IMAGE", "TEXT"],
-      temperature: 0.3,
-    },
-  };
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
-
-  let resp: Response | null = null;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    // Shrink every input to 1024px before upload — big speed gain, no output-quality loss.
+    const dishBufs = await Promise.all(dishes.map((b64) => shrink(Buffer.from(b64, "base64"))));
+    const tableSmall = await shrink(tableBuffer);
+    dishBufs.forEach((buf, i) => {
+      form.append("image[]", new Blob([new Uint8Array(buf)], { type: "image/jpeg" }), `dish${i + 1}.jpg`);
     });
-    if (resp.status !== 503) break;
-    if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 4000));
-  }
+    form.append("image[]", new Blob([new Uint8Array(tableSmall)], { type: "image/jpeg" }), "table.jpg");
 
-  if (!resp!.ok) {
-    const text = await resp!.text();
-    return withCors(NextResponse.json(
-      { error: `Gemini API error: ${text.slice(0, 200)}` },
-      { status: resp!.status }
-    ));
-  }
-
-  const result = await resp!.json();
-
-  for (const candidate of result.candidates || []) {
-    for (const part of candidate.content?.parts || []) {
-      if (part.inlineData) {
-        const imgBuffer = Buffer.from(part.inlineData.data, "base64");
-        return new NextResponse(imgBuffer, {
-          headers: {
-            "Content-Type": `image/${part.inlineData.mimeType?.split("/")[1] || "png"}`,
-            "Content-Disposition": "inline; filename=dish-placer-output.png",
-            ...CORS_HEADERS,
-          },
-        });
-      }
+    let resp: Response | null = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      resp = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${API_KEY}` },
+        body: form,
+      });
+      if (resp.status !== 429 && resp.status < 500) break;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, attempt * 4000));
     }
-  }
 
-  return withCors(NextResponse.json({ error: "No image returned from Gemini" }, { status: 500 }));
+    if (!resp!.ok) {
+      const text = await resp!.text();
+      return withCors(NextResponse.json(
+        { error: `OpenAI API error: ${text.slice(0, 300)}` },
+        { status: resp!.status }
+      ));
+    }
+
+    const result = await resp!.json();
+    const b64 = result?.data?.[0]?.b64_json;
+    if (!b64) {
+      return withCors(NextResponse.json({ error: "No image returned from OpenAI" }, { status: 500 }));
+    }
+
+    const imgBuffer = Buffer.from(b64, "base64");
+    return new NextResponse(imgBuffer, {
+      headers: {
+        "Content-Type": "image/png",
+        "Content-Disposition": "inline; filename=dish-placer-output.png",
+        ...CORS_HEADERS,
+      },
+    });
   } catch (err: any) {
     return withCors(NextResponse.json({ error: err?.message || "Internal server error" }, { status: 500 }));
   }
