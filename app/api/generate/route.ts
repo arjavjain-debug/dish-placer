@@ -13,9 +13,10 @@ async function shrink(buf: Buffer): Promise<Buffer> {
 }
 
 const API_KEY = process.env.OPENAI_API_KEY!;
-const MODEL = "gpt-image-2";
-// "low" effort completes in ~30s (fits Vercel Hobby's 60s cap) at full
-// resolution. "medium" (~70s) and "high" (~220s) need Vercel Pro's 300s limit.
+// gpt-image-1.5 supports input_fidelity:high, which keeps the table's exact
+// appearance and camera angle (gpt-image-2 lacks it and re-renders the table).
+const MODEL = "gpt-image-1.5";
+// "low" effort + high fidelity completes in ~25-45s, under Vercel Hobby's 60s cap.
 const QUALITY = "low";
 
 export const maxDuration = 60;
@@ -101,8 +102,10 @@ Edit the LAST image (the table photo) by placing all ${n} extracted ${n === 1 ? 
 ${layout}
 
 Rules:
-- Keep the EXACT same framing, field of view, zoom level, and composition as the original table photo. Do NOT zoom in, pan, or change the camera perspective in any way.
-- Every chair, floor, wall, and surrounding detail visible in the original must remain visible in the output.
+- The table photo must remain PIXEL-FOR-PIXEL identical except for the newly added dishes. Treat it as a fixed background you are compositing onto.
+- Keep the EXACT same camera angle, perspective, framing, field of view, zoom level, lighting, and composition as the original table photo. Do NOT rotate, tilt, zoom, pan, or re-render the table or its viewpoint in any way.
+- Do NOT move, resize, recolor, or regenerate any object already on the table (existing bowls, cups, napkins, chopsticks, placemats) — leave them exactly where and how they are.
+- Every chair, floor, wall, and surrounding detail visible in the original must remain in the exact same position in the output.
 - Every dish fully visible, no cropping at edges.
 - Match the top-down overhead angle of the table photo.
 - Realistic plate sizes relative to existing items on the table.
@@ -118,6 +121,8 @@ Return only the final edited table photo.`;
     form.append("prompt", prompt);
     form.append("size", pickSize(outputDims));
     form.append("quality", QUALITY);
+    // Preserve the table's exact look and camera angle — only paint in the new dishes.
+    form.append("input_fidelity", "high");
 
     // Shrink every input to 1024px before upload — big speed gain, no output-quality loss.
     const dishBufs = await Promise.all(dishes.map((b64) => shrink(Buffer.from(b64, "base64"))));
