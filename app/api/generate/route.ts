@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       const positionLines = placements
         .map((p) => `  - Image ${p.dishIndex + 1}: place at ${Math.round(p.x)}% from the left edge and ${Math.round(p.y)}% from the top edge of the table image`)
         .join("\n");
-      layout = `Place each dish at the exact positions specified below (as % of the full table image dimensions):\n${positionLines}\nHonor these positions as closely as possible.`;
+      layout = `Place each dish at the positions specified below (as % of the full table image dimensions):\n${positionLines}\nTreat these as target positions, but keeping every dish FULLY on the table surface always takes priority — if a target would push a dish off the table edge or onto a chair, floor, or other surface, move it inward and/or shrink it so the entire plate rests on the table.`;
     } else {
       const layoutInstructions: Record<number, string> = {
         1: "Place the single dish dead-center on the open surface between the two place settings.",
@@ -106,6 +106,8 @@ Rules:
 - Keep the EXACT same camera angle, perspective, framing, field of view, zoom level, lighting, and composition as the original table photo. Do NOT rotate, tilt, zoom, pan, or re-render the table or its viewpoint in any way.
 - Do NOT move, resize, recolor, or regenerate any object already on the table (existing bowls, cups, napkins, chopsticks, placemats) — leave them exactly where and how they are.
 - Every chair, floor, wall, and surrounding detail visible in the original must remain in the exact same position in the output.
+- CRITICAL: every added dish must sit ENTIRELY on the table's surface. No part of any plate may overhang the table edge or rest on a chair, floor, runner gap, or any non-table surface. If the table is narrow, place the dishes closer together along its center and make them smaller so they all fit within the table surface.
+- Size each dish so it fits comfortably on the table with margin to the edges; never let a plate touch or cross a table edge.
 - Every dish fully visible, no cropping at edges.
 - Match the top-down overhead angle of the table photo.
 - Realistic plate sizes relative to existing items on the table.
