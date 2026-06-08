@@ -13,14 +13,13 @@ const DEFAULT_POSITIONS: Record<number, { x: number; y: number }[]> = {
   6: [{ x: 28, y: 37 }, { x: 50, y: 37 }, { x: 72, y: 37 }, { x: 28, y: 63 }, { x: 50, y: 63 }, { x: 72, y: 63 }],
 };
 
-type TableId = "table" | "table2" | "table3" | "table4" | "table5" | "table6" | "table7";
+type TableId = "table" | "table2" | "table3" | "table4" | "table5" | "table6";
 
 // Explicit output dimensions per template (w x h). Tables not listed use natural image dimensions.
 const TABLE_OUTPUT_DIMS: Partial<Record<TableId, { w: number; h: number }>> = {
   table4: { w: 1080, h: 1920 }, // Oak & Coral — 9:16
   table5: { w: 1080, h: 1080 }, // Marble Round — 1:1
   table6: { w: 1920, h: 1080 }, // Charcoal — 16:9
-  table7: { w: 1080, h: 1080 }, // Pine & Leather — 1:1
 };
 
 export default function Home() {
@@ -43,7 +42,6 @@ export default function Home() {
     { id: "table4", label: "Oak & Coral", src: "/table4.jpg" },
     { id: "table5", label: "Marble Round", src: "/table5.jpg" },
     { id: "table6", label: "Charcoal", src: "/table6.jpg" },
-    { id: "table7", label: "Pine & Leather", src: "/table7.jpg" },
   ];
 
   const currentTableSrc = `/${selectedTable}.jpg`;
